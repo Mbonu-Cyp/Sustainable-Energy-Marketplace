@@ -82,3 +82,25 @@
 (define-data-var platform-fee-rate uint u25)     ;; 0.25%
 (define-data-var min-purchase-amount uint u100)  ;; 100 kWh
 (define-data-var credit-validity-period uint u52560) ;; ~365 days in blocks
+
+
+;; Read-Only Functions
+(define-read-only (get-energy-asset (asset-id uint))
+    (map-get? EnergyAssets { asset-id: asset-id })
+)
+
+(define-read-only (get-market-listing (listing-id uint))
+    (map-get? MarketListings { listing-id: listing-id })
+)
+
+(define-read-only (get-producer-profile (producer principal))
+    (map-get? ProducerProfiles { producer: producer })
+)
+
+(define-read-only (get-consumer-balance (consumer principal))
+    (map-get? ConsumerBalances { consumer: consumer })
+)
+
+(define-read-only (calculate-platform-fee (amount uint))
+    (/ (* amount (var-get platform-fee-rate)) u10000)
+)

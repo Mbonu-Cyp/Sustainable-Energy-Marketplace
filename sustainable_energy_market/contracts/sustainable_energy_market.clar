@@ -309,3 +309,19 @@
         ))
     )
 )
+
+;; Contract Management
+(define-public (update-platform-fee (new-rate uint))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (asserts! (<= new-rate u1000) ERR-INVALID-AMOUNT)
+        (ok (var-set platform-fee-rate new-rate))
+    )
+)
+
+(define-public (update-min-purchase (new-amount uint))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (ok (var-set min-purchase-amount new-amount))
+    )
+)

@@ -274,3 +274,38 @@
        )
    )
 )
+
+
+;; Verification Functions
+(define-public (verify-energy-asset
+    (asset-id uint)
+    (certification (string-utf8 50))
+)
+    (let
+        ((caller tx-sender)
+         (asset (unwrap! (get-energy-asset asset-id) ERR-ASSET-NOT-FOUND))
+         (verifier (unwrap! (map-get? Verifiers { address: caller }) ERR-NOT-AUTHORIZED)))
+        
+        ;; Validate verification
+        (asserts! (not (get verified asset)) ERR-ALREADY-VERIFIED)
+        
+        (ok (begin
+            ;; Update asset
+            (map-set EnergyAssets
+                { asset-id: asset-id }
+                (merge asset {
+                    verified: true,
+                    certification: (some certification)
+                })
+            )
+            
+            ;; Update verifier stats
+            (map-set Verifiers
+                { address: caller }
+                (merge verifier {
+                    verifications-count: (+ (get verifications-count verifier) u1)
+                })
+            )
+        ))
+    )
+)

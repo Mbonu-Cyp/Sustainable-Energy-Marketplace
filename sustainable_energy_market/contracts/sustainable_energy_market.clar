@@ -192,3 +192,85 @@
         ))
     )
 )
+
+
+(define-public (purchase-energy-credits
+   (listing-id uint)
+   (amount uint)
+)
+   (let
+       ((caller tx-sender)
+        (listing (unwrap! (get-market-listing listing-id) ERR-LISTING-NOT-FOUND))
+        (asset (unwrap! (get-energy-asset (get asset-id listing)) ERR-ASSET-NOT-FOUND))
+        (total-cost (* amount (get price-per-kwh listing)))
+        (platform-fee (calculate-platform-fee total-cost)))
+       
+       ;; Validate purchase
+       (asserts! (get active listing) ERR-LISTING-NOT-FOUND)
+       (asserts! (>= amount (get min-purchase listing)) ERR-INVALID-AMOUNT)
+       (asserts! (<= amount (get available-amount listing)) ERR-INSUFFICIENT-BALANCE)
+       (asserts! (< block-height (get expiry-date asset)) ERR-EXPIRED)
+       
+       ;; Process payment
+       (try! (stx-transfer? total-cost caller (get seller listing)))
+       (try! (stx-transfer? platform-fee caller (var-get contract-owner)))
+       
+       (let ((consumer-balance (get-consumer-balance caller))
+             (producer-profile (get-producer-profile (get seller listing))))
+           
+           ;; Update listing
+           (map-set MarketListings
+               { listing-id: listing-id }
+               (merge listing {
+                   available-amount: (- (get available-amount listing) amount),
+                   total-sold: (+ (get total-sold listing) amount),
+                   active: (> (- (get available-amount listing) amount) u0)
+               })
+           )
+           
+           ;; Update asset
+           (map-set EnergyAssets
+               { asset-id: (get asset-id listing) }
+               (merge asset {
+                   remaining-amount: (- (get remaining-amount asset) amount)
+               })
+           )
+           
+           ;; Update consumer balance
+           (match consumer-balance
+               prev-balance (map-set ConsumerBalances
+                   { consumer: caller }
+                   {
+                       total-purchased: (+ (get total-purchased prev-balance) amount),
+                       active-credits: (+ (get active-credits prev-balance) amount),
+                       spent-credits: (get spent-credits prev-balance),
+                       last-purchase: block-height
+                   }
+               )
+               (map-set ConsumerBalances
+                   { consumer: caller }
+                   {
+                       total-purchased: amount,
+                       active-credits: amount,
+                       spent-credits: u0,
+                       last-purchase: block-height
+                   }
+               )
+           )
+           
+           ;; Update producer profile if exists
+           (match producer-profile
+               prev-profile (begin
+                   (map-set ProducerProfiles
+                       { producer: (get seller listing) }
+                       (merge prev-profile {
+                           total-sold: (+ (get total-sold prev-profile) amount)
+                       })
+                   )
+                   (ok true)
+               )
+               (ok true) ;; If no profile exists, still succeed
+           )
+       )
+   )
+)

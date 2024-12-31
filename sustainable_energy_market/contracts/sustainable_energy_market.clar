@@ -152,3 +152,43 @@
         )
     )
 )
+
+;; Market Functions
+(define-public (create-market-listing
+    (asset-id uint)
+    (price-per-kwh uint)
+    (min-purchase uint)
+)
+    (let
+        ((listing-id (var-get next-listing-id))
+         (caller tx-sender)
+         (asset (unwrap! (get-energy-asset asset-id) ERR-ASSET-NOT-FOUND)))
+        
+        ;; Validate listing
+        (asserts! (is-eq caller (get producer asset)) ERR-NOT-AUTHORIZED)
+        (asserts! (get verified asset) ERR-NOT-VERIFIED)
+        (asserts! (> (get remaining-amount asset) u0) ERR-INSUFFICIENT-BALANCE)
+        (asserts! (>= min-purchase (var-get min-purchase-amount)) ERR-INVALID-AMOUNT)
+        
+        (ok (begin
+            ;; Create listing
+            (map-set MarketListings
+                { listing-id: listing-id }
+                {
+                    asset-id: asset-id,
+                    seller: caller,
+                    price-per-kwh: price-per-kwh,
+                    min-purchase: min-purchase,
+                    available-amount: (get remaining-amount asset),
+                    creation-date: block-height,
+                    active: true,
+                    total-sold: u0
+                }
+            )
+            
+            ;; Increment listing counter
+            (var-set next-listing-id (+ listing-id u1))
+            listing-id
+        ))
+    )
+)

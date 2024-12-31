@@ -74,3 +74,11 @@
         active-since: uint       ;; block height
     }
 )
+
+;; Data Variables
+(define-data-var contract-owner principal tx-sender)
+(define-data-var next-asset-id uint u1)
+(define-data-var next-listing-id uint u1)
+(define-data-var platform-fee-rate uint u25)     ;; 0.25%
+(define-data-var min-purchase-amount uint u100)  ;; 100 kWh
+(define-data-var credit-validity-period uint u52560) ;; ~365 days in blocks

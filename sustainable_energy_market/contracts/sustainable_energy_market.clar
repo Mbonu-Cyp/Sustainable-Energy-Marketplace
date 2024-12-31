@@ -104,3 +104,51 @@
 (define-read-only (calculate-platform-fee (amount uint))
     (/ (* amount (var-get platform-fee-rate)) u10000)
 )
+
+(define-public (register-energy-asset 
+    (energy-type (string-utf8 20))
+    (amount uint)
+    (location (string-utf8 100))
+    (expiry-blocks uint)
+)
+    (let
+        ((asset-id (var-get next-asset-id))
+         (caller tx-sender)
+         (producer-profile (get-producer-profile caller)))
+        
+        ;; Validate producer and amount
+        (asserts! (is-some producer-profile) ERR-NOT-AUTHORIZED)
+        (asserts! (> amount u0) ERR-INVALID-AMOUNT)
+        
+        ;; Unwrap producer profile and proceed with registration
+        (let ((prev-profile (unwrap! producer-profile ERR-NOT-AUTHORIZED)))
+            ;; Create energy asset
+            (map-set EnergyAssets
+                { asset-id: asset-id }
+                {
+                    producer: caller,
+                    energy-type: energy-type,
+                    amount: amount,
+                    generation-date: block-height,
+                    expiry-date: (+ block-height expiry-blocks),
+                    location: location,
+                    verified: false,
+                    certification: none,
+                    remaining-amount: amount
+                }
+            )
+            
+            ;; Update producer profile
+            (map-set ProducerProfiles
+                { producer: caller }
+                (merge prev-profile {
+                    total-generated: (+ (get total-generated prev-profile) amount)
+                })
+            )
+            
+            ;; Increment asset counter and return
+            (var-set next-asset-id (+ asset-id u1))
+            (ok asset-id)
+        )
+    )
+)
